@@ -287,7 +287,7 @@ class Builder extends BaseBuilder {
         $key = [
             'connection' => $this->connection->getName(),
             'collection' => $this->collection->getName(),
-            'wheres'     => $this->wheres,
+            'wheres'     => $this->compileWheres(),
             'columns'    => $this->columns,
             'groups'     => $this->groups,
             'orders'     => $this->orders,
