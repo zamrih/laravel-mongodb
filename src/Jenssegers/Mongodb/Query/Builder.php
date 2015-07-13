@@ -291,6 +291,7 @@ class Builder extends BaseBuilder {
             'columns'    => $this->columns,
             'groups'     => $this->groups,
             'orders'     => $this->orders,
+            'distinct'     => $this->distinct
             'offset'     => $this->offset,
             'limit'      => $this->limit,
             'aggregate'  => $this->aggregate,
