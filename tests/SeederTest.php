@@ -1,7 +1,7 @@
 <?php
 
-class SeederTest extends TestCase {
-
+class SeederTest extends TestCase
+{
     public function tearDown()
     {
         User::truncate();
@@ -23,5 +23,4 @@ class SeederTest extends TestCase {
         $user = User::where('name', 'John Doe')->first();
         $this->assertTrue($user->seed);
     }
-
 }

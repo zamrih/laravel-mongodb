@@ -3,8 +3,8 @@
 use Closure;
 use Jenssegers\Mongodb\Connection;
 
-class Builder extends \Illuminate\Database\Schema\Builder {
-
+class Builder extends \Illuminate\Database\Schema\Builder
+{
     /**
      * Create a new database Schema manager.
      *
@@ -13,6 +13,30 @@ class Builder extends \Illuminate\Database\Schema\Builder {
     public function __construct(Connection $connection)
     {
         $this->connection = $connection;
+    }
+
+    /**
+     * Determine if the given table has a given column.
+     *
+     * @param  string  $table
+     * @param  string  $column
+     * @return bool
+     */
+    public function hasColumn($table, $column)
+    {
+        return true;
+    }
+
+    /**
+     * Determine if the given table has given columns.
+     *
+     * @param  string  $table
+     * @param  array   $columns
+     * @return bool
+     */
+    public function hasColumns($table, array $columns)
+    {
+        return true;
     }
 
     /**
@@ -25,7 +49,13 @@ class Builder extends \Illuminate\Database\Schema\Builder {
     {
         $db = $this->connection->getMongoDB();
 
-        return in_array($collection, $db->getCollectionNames());
+        foreach ($db->listCollections() as $collectionFromMongo) {
+            if ($collectionFromMongo->getName() == $collection) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -50,8 +80,7 @@ class Builder extends \Illuminate\Database\Schema\Builder {
     {
         $blueprint = $this->createBlueprint($collection);
 
-        if ($callback)
-        {
+        if ($callback) {
             $callback($blueprint);
         }
     }
@@ -81,8 +110,7 @@ class Builder extends \Illuminate\Database\Schema\Builder {
 
         $blueprint->create();
 
-        if ($callback)
-        {
+        if ($callback) {
             $callback($blueprint);
         }
     }
@@ -110,5 +138,4 @@ class Builder extends \Illuminate\Database\Schema\Builder {
     {
         return new Blueprint($this->connection, $collection);
     }
-
 }

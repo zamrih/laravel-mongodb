@@ -1,13 +1,13 @@
 <?php namespace Jenssegers\Mongodb;
 
 use Illuminate\Support\ServiceProvider;
+use Jenssegers\Mongodb\Eloquent\Model;
+use Jenssegers\Mongodb\Queue\MongoConnector;
 
-class MongodbServiceProvider extends ServiceProvider {
-
+class MongodbServiceProvider extends ServiceProvider
+{
     /**
      * Bootstrap the application events.
-     *
-     * @return void
      */
     public function boot()
     {
@@ -18,18 +18,21 @@ class MongodbServiceProvider extends ServiceProvider {
 
     /**
      * Register the service provider.
-     *
-     * @return void
      */
     public function register()
     {
-        $this->app->resolving('db', function ($db)
-        {
-            $db->extend('mongodb', function ($config)
-            {
+        // Add database driver.
+        $this->app->resolving('db', function ($db) {
+            $db->extend('mongodb', function ($config) {
                 return new Connection($config);
             });
         });
-    }
 
+        // Add connector for queue support.
+        $this->app->resolving('queue', function ($queue) {
+            $queue->addConnector('mongodb', function () {
+                return new MongoConnector($this->app['db']);
+            });
+        });
+    }
 }

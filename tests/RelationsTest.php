@@ -1,7 +1,7 @@
 <?php
 
-class RelationsTest extends TestCase {
-
+class RelationsTest extends TestCase
+{
     public function tearDown()
     {
         Mockery::close();
@@ -291,6 +291,18 @@ class RelationsTest extends TestCase {
         $this->assertCount(2, $user->clients);
     }
 
+    public function testBelongsToManyAttachEloquentCollection()
+    {
+        $user = User::create(['name' => 'John Doe']);
+        $client1 = Client::create(['name' => 'Test 1']);
+        $client2 = Client::create(['name' => 'Test 2']);
+        $collection = new \Illuminate\Database\Eloquent\Collection([$client1, $client2]);
+
+        $user = User::where('name', '=', 'John Doe')->first();
+        $user->clients()->attach($collection);
+        $this->assertCount(2, $user->clients);
+    }
+
     public function testBelongsToManySyncAlreadyPresent()
     {
         $user = User::create(['name' => 'John Doe']);
@@ -322,8 +334,8 @@ class RelationsTest extends TestCase {
         $this->assertTrue(array_key_exists('groups', $user->getAttributes()));
 
         // Assert they are attached
-        $this->assertTrue(in_array($group->_id, $user->groups));
-        $this->assertTrue(in_array($user->_id, $group->users));
+        $this->assertTrue(in_array($group->_id, $user->groups->pluck('_id')->toArray()));
+        $this->assertTrue(in_array($user->_id, $group->users->pluck('_id')->toArray()));
         $this->assertEquals($group->_id, $user->groups()->first()->_id);
         $this->assertEquals($user->_id, $group->users()->first()->_id);
     }
@@ -364,11 +376,11 @@ class RelationsTest extends TestCase {
         $photos = Photo::with('imageable')->get();
         $relations = $photos[0]->getRelations();
         $this->assertTrue(array_key_exists('imageable', $relations));
-        $this->assertInstanceOf('User', $relations['imageable']);
+        $this->assertInstanceOf('User', $photos[0]->imageable);
 
         $relations = $photos[1]->getRelations();
         $this->assertTrue(array_key_exists('imageable', $relations));
-        $this->assertInstanceOf('Client', $relations['imageable']);
+        $this->assertInstanceOf('Client', $photos[1]->imageable);
     }
 
     public function testHasManyHas()
@@ -410,17 +422,13 @@ class RelationsTest extends TestCase {
         $authors = User::has('books', '!=', 0)->get();
         $this->assertCount(2, $authors);
 
-        $authors = User::whereHas('books', function ($query)
-        {
+        $authors = User::whereHas('books', function ($query) {
             $query->where('rating', 5);
-
         })->get();
         $this->assertCount(1, $authors);
 
-        $authors = User::whereHas('books', function ($query)
-        {
+        $authors = User::whereHas('books', function ($query) {
             $query->where('rating', '<', 5);
-
         })->get();
         $this->assertCount(1, $authors);
     }
@@ -521,5 +529,4 @@ class RelationsTest extends TestCase {
         $this->assertEquals([$user->_id], $client->user_ids);
         $this->assertEquals([$client->_id], $user->client_ids);
     }
-
 }

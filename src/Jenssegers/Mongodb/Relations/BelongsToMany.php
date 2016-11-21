@@ -1,16 +1,15 @@
 <?php namespace Jenssegers\Mongodb\Relations;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany as EloquentBelongsToMany;
 
-class BelongsToMany extends EloquentBelongsToMany {
-
+class BelongsToMany extends EloquentBelongsToMany
+{
     /**
      * Hydrate the pivot table relationship on the models.
      *
      * @param  array  $models
-     * @return void
      */
     protected function hydratePivotRelation(array $models)
     {
@@ -23,19 +22,19 @@ class BelongsToMany extends EloquentBelongsToMany {
      * @param  array  $columns
      * @return \Illuminate\Database\Eloquent\Relations\BelongsToMany
      */
-    protected function getSelectColumns(array $columns = array('*'))
+    protected function getSelectColumns(array $columns = ['*'])
     {
         return $columns;
     }
 
     /**
      * Set the base constraints on the relation query.
-     *
-     * @return void
      */
     public function addConstraints()
     {
-        if (static::$constraints) $this->setWhere();
+        if (static::$constraints) {
+            $this->setWhere();
+        }
     }
 
     /**
@@ -60,9 +59,9 @@ class BelongsToMany extends EloquentBelongsToMany {
      * @param  bool   $touch
      * @return \Illuminate\Database\Eloquent\Model
      */
-    public function save(Model $model, array $joining = array(), $touch = true)
+    public function save(Model $model, array $joining = [], $touch = true)
     {
-        $model->save(array('touch' => false));
+        $model->save(['touch' => false]);
 
         $this->attach($model, $joining, $touch);
 
@@ -77,14 +76,14 @@ class BelongsToMany extends EloquentBelongsToMany {
      * @param  bool   $touch
      * @return \Illuminate\Database\Eloquent\Model
      */
-    public function create(array $attributes, array $joining = array(), $touch = true)
+    public function create(array $attributes, array $joining = [], $touch = true)
     {
         $instance = $this->related->newInstance($attributes);
 
         // Once we save the related model, we need to attach it to the base model via
         // through intermediate table so we'll use the existing "attach" method to
         // accomplish this which will insert the record and any more attributes.
-        $instance->save(array('touch' => false));
+        $instance->save(['touch' => false]);
 
         $this->attach($instance, $joining, $touch);
 
@@ -100,19 +99,23 @@ class BelongsToMany extends EloquentBelongsToMany {
      */
     public function sync($ids, $detaching = true)
     {
-        $changes = array(
-            'attached' => array(), 'detached' => array(), 'updated' => array(),
-        );
+        $changes = [
+            'attached' => [], 'detached' => [], 'updated' => [],
+        ];
 
-        if ($ids instanceof Collection) $ids = $ids->modelKeys();
+        if ($ids instanceof Collection) {
+            $ids = $ids->modelKeys();
+        }
 
         // First we need to attach any of the associated models that are not currently
         // in this joining table. We'll spin through the given IDs, checking to see
         // if they exist in the array of current ones, and if not we will insert.
-        $current = $this->parent->{$this->otherKey} ?: array();
+        $current = $this->parent->{$this->otherKey} ?: [];
 
         // See issue #256.
-        if ($current instanceof Collection) $current = $ids->modelKeys();
+        if ($current instanceof Collection) {
+            $current = $ids->modelKeys();
+        }
 
         $records = $this->formatSyncList($ids);
 
@@ -125,11 +128,12 @@ class BelongsToMany extends EloquentBelongsToMany {
         // Next, we will take the differences of the currents and given IDs and detach
         // all of the entities that exist in the "current" array but are not in the
         // the array of the IDs given to the method which will complete the sync.
-        if ($detaching and count($detach) > 0)
-        {
+        if ($detaching and count($detach) > 0) {
             $this->detach($detach);
 
-            $changes['detached'] = (array) array_map(function ($v) { return (int) $v; }, $detach);
+            $changes['detached'] = (array) array_map(function ($v) {
+                return is_numeric($v) ? (int) $v : (string) $v;
+            }, $detach);
         }
 
         // Now we are finally ready to attach the new records. Note that we'll disable
@@ -139,8 +143,7 @@ class BelongsToMany extends EloquentBelongsToMany {
             $changes, $this->attachNew($records, $current, false)
         );
 
-        if (count($changes['attached']) || count($changes['updated']))
-        {
+        if (count($changes['attached']) || count($changes['updated'])) {
             $this->touchIfTouching();
         }
 
@@ -153,7 +156,6 @@ class BelongsToMany extends EloquentBelongsToMany {
      * @param  mixed  $id
      * @param  array  $attributes
      * @param  bool   $touch
-     * @return void
      */
     public function updateExistingPivot($id, array $attributes, $touch = true)
     {
@@ -166,21 +168,21 @@ class BelongsToMany extends EloquentBelongsToMany {
      * @param  mixed  $id
      * @param  array  $attributes
      * @param  bool   $touch
-     * @return void
      */
-    public function attach($id, array $attributes = array(), $touch = true)
+    public function attach($id, array $attributes = [], $touch = true)
     {
-        if ($id instanceof Model)
-        {
+        if ($id instanceof Model) {
             $model = $id;
 
             $id = $model->getKey();
 
             // Attach the new parent id to the related model.
             $model->push($this->foreignKey, $this->parent->getKey(), true);
-        }
-        else
-        {
+        } else {
+            if ($id instanceof Collection) {
+                $id = $id->modelKeys();
+            }
+
             $query = $this->newRelatedQuery();
 
             $query->whereIn($this->related->getKeyName(), (array) $id);
@@ -192,7 +194,9 @@ class BelongsToMany extends EloquentBelongsToMany {
         // Attach the new ids to the parent model.
         $this->parent->push($this->otherKey, (array) $id, true);
 
-        if ($touch) $this->touchIfTouching();
+        if ($touch) {
+            $this->touchIfTouching();
+        }
     }
 
     /**
@@ -202,9 +206,11 @@ class BelongsToMany extends EloquentBelongsToMany {
      * @param  bool  $touch
      * @return int
      */
-    public function detach($ids = array(), $touch = true)
+    public function detach($ids = [], $touch = true)
     {
-        if ($ids instanceof Model) $ids = (array) $ids->getKey();
+        if ($ids instanceof Model) {
+            $ids = (array) $ids->getKey();
+        }
 
         $query = $this->newRelatedQuery();
 
@@ -217,15 +223,16 @@ class BelongsToMany extends EloquentBelongsToMany {
         $this->parent->pull($this->otherKey, $ids);
 
         // Prepare the query to select all related objects.
-        if (count($ids) > 0)
-        {
+        if (count($ids) > 0) {
             $query->whereIn($this->related->getKeyName(), $ids);
         }
 
         // Remove the relation to the parent.
         $query->pull($this->foreignKey, $this->parent->getKey());
 
-        if ($touch) $this->touchIfTouching();
+        if ($touch) {
+            $this->touchIfTouching();
+        }
 
         return count($ids);
     }
@@ -243,12 +250,10 @@ class BelongsToMany extends EloquentBelongsToMany {
         // First we will build a dictionary of child models keyed by the foreign key
         // of the relation so that we will easily and quickly match them to their
         // parents without having a possibly slow inner loops for every models.
-        $dictionary = array();
+        $dictionary = [];
 
-        foreach ($results as $result)
-        {
-            foreach ($result->$foreign as $item)
-            {
+        foreach ($results as $result) {
+            foreach ($result->$foreign as $item) {
                 $dictionary[$item][] = $result;
             }
         }
@@ -284,5 +289,25 @@ class BelongsToMany extends EloquentBelongsToMany {
     public function getForeignKey()
     {
         return $this->foreignKey;
+    }
+
+    /**
+     * Format the sync list so that it is keyed by ID. (Legacy Support)
+     * The original function has been renamed to formatRecordsList since Laravel 5.3
+     *
+     * @deprecated
+     * @param  array  $records
+     * @return array
+     */
+    protected function formatSyncList(array $records)
+    {
+        $results = [];
+        foreach ($records as $id => $attributes) {
+            if (! is_array($attributes)) {
+                list($id, $attributes) = [$attributes, []];
+            }
+            $results[$id] = $attributes;
+        }
+        return $results;
     }
 }

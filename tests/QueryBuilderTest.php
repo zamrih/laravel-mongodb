@@ -1,7 +1,10 @@
 <?php
 
-class QueryBuilderTest extends TestCase {
+use MongoDB\BSON\UTCDateTime;
+use MongoDB\BSON\Regex;
 
+class QueryBuilderTest extends TestCase
+{
     public function tearDown()
     {
         DB::collection('users')->truncate();
@@ -26,7 +29,7 @@ class QueryBuilderTest extends TestCase {
 
     public function testNoDocument()
     {
-        $items = DB::collection('items')->where('name', 'nothing')->get();
+        $items = DB::collection('items')->where('name', 'nothing')->get()->toArray();
         $this->assertEquals([], $items);
 
         $item = DB::collection('items')->where('name', 'nothing')->first();
@@ -54,7 +57,7 @@ class QueryBuilderTest extends TestCase {
     public function testInsertGetId()
     {
         $id = DB::collection('users')->insertGetId(['name' => 'John Doe']);
-        $this->assertInstanceOf('MongoId', $id);
+        $this->assertInstanceOf('MongoDB\BSON\ObjectID', $id);
     }
 
     public function testBatchInsert()
@@ -179,13 +182,12 @@ class QueryBuilderTest extends TestCase {
             ['name' => 'John Doe', 'age' => 25],
         ]);
 
-        $cursor = DB::collection('users')->raw(function ($collection)
-        {
+        $cursor = DB::collection('users')->raw(function ($collection) {
             return $collection->find(['age' => 20]);
         });
 
-        $this->assertInstanceOf('MongoCursor', $cursor);
-        $this->assertEquals(1, $cursor->count());
+        $this->assertInstanceOf('MongoDB\Driver\Cursor', $cursor);
+        $this->assertEquals(1, count($cursor->toArray()));
 
         $collection = DB::collection('users')->raw();
         $this->assertInstanceOf('Jenssegers\Mongodb\Collection', $collection);
@@ -241,7 +243,7 @@ class QueryBuilderTest extends TestCase {
         $this->assertEquals(4, count($user['tags']));
         $this->assertEquals(2, count($user['messages']));
 
-        DB::collection('users')->where('_id', $id)->push(['messages' => ['date' => new MongoDate(), 'body' => 'Hi John']]);
+        DB::collection('users')->where('_id', $id)->push(['messages' => ['date' => new DateTime(), 'body' => 'Hi John']]);
         $user = DB::collection('users')->find($id);
         $this->assertEquals(3, count($user['messages']));
     }
@@ -286,11 +288,13 @@ class QueryBuilderTest extends TestCase {
             ['name' => 'spoon', 'type' => 'round'],
         ]);
 
-        $items = DB::collection('items')->distinct('name')->get(); sort($items);
+        $items = DB::collection('items')->distinct('name')->get()->toArray();
+        sort($items);
         $this->assertEquals(3, count($items));
         $this->assertEquals(['fork', 'knife', 'spoon'], $items);
 
-        $types = DB::collection('items')->distinct('type')->get(); sort($types);
+        $types = DB::collection('items')->distinct('type')->get()->toArray();
+        sort($types);
         $this->assertEquals(2, count($types));
         $this->assertEquals(['round', 'sharp'], $types);
     }
@@ -353,8 +357,8 @@ class QueryBuilderTest extends TestCase {
             ['name' => 'John Doe', 'age' => 25],
         ]);
 
-        $age = DB::collection('users')->where('name', 'John Doe')->pluck('age');
-        $this->assertEquals(25, $age);
+        $age = DB::collection('users')->where('name', 'John Doe')->pluck('age')->toArray();
+        $this->assertEquals([25], $age);
     }
 
     public function testList()
@@ -366,16 +370,16 @@ class QueryBuilderTest extends TestCase {
             ['name' => 'spoon', 'type' => 'round', 'amount' => 14],
         ]);
 
-        $list = DB::collection('items')->lists('name');
+        $list = DB::collection('items')->pluck('name')->toArray();
         sort($list);
         $this->assertEquals(4, count($list));
         $this->assertEquals(['fork', 'knife', 'spoon', 'spoon'], $list);
 
-        $list = DB::collection('items')->lists('type', 'name');
+        $list = DB::collection('items')->pluck('type', 'name')->toArray();
         $this->assertEquals(3, count($list));
         $this->assertEquals(['knife' => 'sharp', 'fork' => 'sharp', 'spoon' => 'round'], $list);
 
-        $list = DB::collection('items')->lists('name', '_id');
+        $list = DB::collection('items')->pluck('name', '_id')->toArray();
         $this->assertEquals(4, count($list));
         $this->assertEquals(24, strlen(key($list)));
     }
@@ -415,6 +419,22 @@ class QueryBuilderTest extends TestCase {
         $this->assertEquals(16.25, DB::collection('items')->avg('amount.hidden'));
     }
 
+    public function testSubdocumentArrayAggregate()
+    {
+        DB::collection('items')->insert([
+            ['name' => 'knife', 'amount' => [['hidden' => 10, 'found' => 3], ['hidden' => 5, 'found' => 2]]],
+            ['name' => 'fork',  'amount' => [['hidden' => 35, 'found' => 12], ['hidden' => 7, 'found' => 17], ['hidden' => 1, 'found' => 19]]],
+            ['name' => 'spoon', 'amount' => [['hidden' => 14, 'found' => 21]]],
+            ['name' => 'teaspoon', 'amount' => []],
+        ]);
+
+        $this->assertEquals(72, DB::collection('items')->sum('amount.*.hidden'));
+        $this->assertEquals(6, DB::collection('items')->count('amount.*.hidden'));
+        $this->assertEquals(1, DB::collection('items')->min('amount.*.hidden'));
+        $this->assertEquals(35, DB::collection('items')->max('amount.*.hidden'));
+        $this->assertEquals(12, DB::collection('items')->avg('amount.*.hidden'));
+    }
+
     public function testUpsert()
     {
         DB::collection('items')->where('name', 'knife')
@@ -424,6 +444,14 @@ class QueryBuilderTest extends TestCase {
                                 );
 
         $this->assertEquals(1, DB::collection('items')->count());
+
+        Item::where('name', 'spoon')
+             ->update(
+                ['amount' => 1],
+                ['upsert' => true]
+            );
+
+        $this->assertEquals(2, DB::collection('items')->count());
     }
 
     public function testUnset()
@@ -461,20 +489,20 @@ class QueryBuilderTest extends TestCase {
     public function testDates()
     {
         DB::collection('users')->insert([
-            ['name' => 'John Doe', 'birthday' => new MongoDate(strtotime("1980-01-01 00:00:00"))],
-            ['name' => 'Jane Doe', 'birthday' => new MongoDate(strtotime("1981-01-01 00:00:00"))],
-            ['name' => 'Robert Roe', 'birthday' => new MongoDate(strtotime("1982-01-01 00:00:00"))],
-            ['name' => 'Mark Moe', 'birthday' => new MongoDate(strtotime("1983-01-01 00:00:00"))],
+            ['name' => 'John Doe', 'birthday' => new UTCDateTime(1000 * strtotime("1980-01-01 00:00:00"))],
+            ['name' => 'Jane Doe', 'birthday' => new UTCDateTime(1000 * strtotime("1981-01-01 00:00:00"))],
+            ['name' => 'Robert Roe', 'birthday' => new UTCDateTime(1000 * strtotime("1982-01-01 00:00:00"))],
+            ['name' => 'Mark Moe', 'birthday' => new UTCDateTime(1000 * strtotime("1983-01-01 00:00:00"))],
         ]);
 
-        $user = DB::collection('users')->where('birthday', new MongoDate(strtotime("1980-01-01 00:00:00")))->first();
+        $user = DB::collection('users')->where('birthday', new UTCDateTime(1000 * strtotime("1980-01-01 00:00:00")))->first();
         $this->assertEquals('John Doe', $user['name']);
 
         $user = DB::collection('users')->where('birthday', '=', new DateTime("1980-01-01 00:00:00"))->first();
         $this->assertEquals('John Doe', $user['name']);
 
-        $start = new MongoDate(strtotime("1981-01-01 00:00:00"));
-        $stop = new MongoDate(strtotime("1982-01-01 00:00:00"));
+        $start = new UTCDateTime(1000 * strtotime("1981-01-01 00:00:00"));
+        $stop = new UTCDateTime(1000 * strtotime("1982-01-01 00:00:00"));
 
         $users = DB::collection('users')->whereBetween('birthday', [$start, $stop])->get();
         $this->assertEquals(2, count($users));
@@ -537,11 +565,11 @@ class QueryBuilderTest extends TestCase {
         $results = DB::collection('items')->where('tags', 'size', 4)->get();
         $this->assertEquals(1, count($results));
 
-        $regex = new MongoRegex("/.*doe/i");
+        $regex = new Regex(".*doe", "i");
         $results = DB::collection('users')->where('name', 'regex', $regex)->get();
         $this->assertEquals(2, count($results));
 
-        $regex = new MongoRegex("/.*doe/i");
+        $regex = new Regex(".*doe", "i");
         $results = DB::collection('users')->where('name', 'regexp', $regex)->get();
         $this->assertEquals(2, count($results));
 
@@ -635,10 +663,8 @@ class QueryBuilderTest extends TestCase {
 
         $results = DB::collection('items')->project(['tags' => ['$slice' => 1]])->get();
 
-        foreach ($results as $result)
-        {
+        foreach ($results as $result) {
             $this->assertEquals(1, count($result['tags']));
         }
     }
-
 }

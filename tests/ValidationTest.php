@@ -1,7 +1,7 @@
 <?php
 
-class ValidationTest extends TestCase {
-
+class ValidationTest extends TestCase
+{
     public function tearDown()
     {
         User::truncate();
@@ -23,5 +23,4 @@ class ValidationTest extends TestCase {
         );
         $this->assertTrue($validator->fails());
     }
-
 }

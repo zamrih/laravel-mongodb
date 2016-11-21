@@ -1,9 +1,10 @@
 <?php
 
 use Illuminate\Auth\Passwords\PasswordBroker;
+use Illuminate\Foundation\Application;
 
-class AuthTest extends TestCase {
-
+class AuthTest extends TestCase
+{
     public function tearDown()
     {
         User::truncate();
@@ -22,8 +23,12 @@ class AuthTest extends TestCase {
         $this->assertTrue(Auth::check());
     }
 
-    public function testRemind()
+    public function testRemindOld()
     {
+        if (Application::VERSION >= '5.2') {
+            return;
+        }
+
         $mailer = Mockery::mock('Illuminate\Mail\Mailer');
         $tokens = $this->app->make('auth.password.tokens');
         $users = $this->app['auth']->driver()->getProvider();
@@ -43,7 +48,7 @@ class AuthTest extends TestCase {
         $reminder = DB::collection('password_resets')->first();
         $this->assertEquals('john@doe.com', $reminder['email']);
         $this->assertNotNull($reminder['token']);
-        $this->assertInstanceOf('MongoDate', $reminder['created_at']);
+        $this->assertInstanceOf('MongoDB\BSON\UTCDateTime', $reminder['created_at']);
 
         $credentials = [
             'email'                 => 'john@doe.com',
@@ -52,8 +57,7 @@ class AuthTest extends TestCase {
             'token'                 => $reminder['token'],
         ];
 
-        $response = $broker->reset($credentials, function ($user, $password)
-        {
+        $response = $broker->reset($credentials, function ($user, $password) {
             $user->password = bcrypt($password);
             $user->save();
         });
@@ -61,5 +65,4 @@ class AuthTest extends TestCase {
         $this->assertEquals('passwords.reset', $response);
         $this->assertEquals(0, DB::collection('password_resets')->count());
     }
-
 }
