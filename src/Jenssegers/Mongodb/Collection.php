@@ -65,4 +65,41 @@ class Collection
 
         return $result;
     }
+    
+     /**
+     * Handle specific insert call.
+     * Cannot be handled dynamically because a reference needs to be passed
+     * @param  array|object   $document
+     * @param  array   $options
+     * @return mixed
+     */
+    public function insert(&$document, array $options = [])
+    {
+        return $this->__call('insert', array(&$document, $options));
+    }
+    
+     /**
+     * Handle specific batchInsert call.
+     * Cannot be handled dynamically because a reference needs to be passed
+     * @param  array   $a
+     * @param  array   $options
+     * @return mixed
+     */
+    public function batchInsert(array &$a, array $options = [])
+    {
+        return $this->__call('batchInsert', array(&$a, $options));
+    }
+    
+     /**
+     * Handle specific save call.
+     * Cannot be handled dynamically because a reference needs to be passed
+     * @param  array|object   $document
+     * @param  array   $options
+     * @return mixed
+     */
+    public function save(&$document, array $options = [])
+    {
+        return $this->__call('save', array(&$document, $options));
+    }
+
 }
